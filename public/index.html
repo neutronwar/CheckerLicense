@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>License Checker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500&display=swap" rel="stylesheet" />
+  <script>
+    // Apply saved theme before paint to avoid a flash
+    try { const t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
+  <style>
+    :root {
+      --bg: #09090b;
+      --surface: #111114;
+      --surface-2: #18181c;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.14);
+      --text: #fafafa;
+      --muted: #a1a1aa;
+      --faint: #71717a;
+      --accent: #7c6cf6;
+      --accent-2: #22d3ee;
+      --accent-soft: rgba(124, 108, 246, 0.16);
+      --ok: #34d399;
+      --ok-soft: rgba(52, 211, 153, 0.12);
+      --bad: #f87171;
+      --bad-soft: rgba(248, 113, 113, 0.12);
+      --warn: #fbbf24;
+      --warn-soft: rgba(251, 191, 36, 0.1);
+      --shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 40px 80px -24px rgba(0,0,0,.7);
+      --glow-opacity: .28;
+      color-scheme: dark;
+    }
+    :root[data-theme="light"] {
+      --bg: #f6f6f8;
+      --surface: #ffffff;
+      --surface-2: #f4f4f6;
+      --border: rgba(9, 9, 11, 0.08);
+      --border-strong: rgba(9, 9, 11, 0.14);
+      --text: #09090b;
+      --muted: #52525b;
+      --faint: #a1a1aa;
+      --accent: #6d5ce8;
+      --accent-2: #0891b2;
+      --accent-soft: rgba(109, 92, 232, 0.12);
+      --ok: #059669;
+      --ok-soft: rgba(5, 150, 105, 0.1);
+      --bad: #dc2626;
+      --bad-soft: rgba(220, 38, 38, 0.08);
+      --warn: #b45309;
+      --warn-soft: rgba(217, 119, 6, 0.1);
+      --shadow: 0 1px 2px rgba(9,9,11,.04), 0 24px 60px -24px rgba(9,9,11,.18);
+      --glow-opacity: .18;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) {
+        --bg: #f6f6f8;
+        --surface: #ffffff;
+        --surface-2: #f4f4f6;
+        --border: rgba(9, 9, 11, 0.08);
+        --border-strong: rgba(9, 9, 11, 0.14);
+        --text: #09090b;
+        --muted: #52525b;
+        --faint: #a1a1aa;
+        --accent: #6d5ce8;
+        --accent-2: #0891b2;
+        --accent-soft: rgba(109, 92, 232, 0.12);
+        --ok: #059669;
+        --ok-soft: rgba(5, 150, 105, 0.1);
+        --bad: #dc2626;
+        --bad-soft: rgba(220, 38, 38, 0.08);
+        --warn: #b45309;
+        --warn-soft: rgba(217, 119, 6, 0.1);
+        --shadow: 0 1px 2px rgba(9,9,11,.04), 0 24px 60px -24px rgba(9,9,11,.18);
+        --glow-opacity: .18;
+        color-scheme: light;
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 40px 16px; font-family: 'Geist', system-ui, sans-serif; font-size: 14px;
+      background: var(--bg); color: var(--text); overflow-x: hidden;
+      -webkit-font-smoothing: antialiased; transition: background .3s, color .3s;
+    }
+    svg { display: block; }
+
+    /* Background */
+    .aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+    .aurora span {
+      position: absolute; border-radius: 50%; filter: blur(100px); opacity: var(--glow-opacity);
+      animation: drift 22s ease-in-out infinite;
+    }
+    .aurora span:nth-child(1) { width: 480px; height: 480px; background: var(--accent); top: -180px; left: 50%; margin-left: -420px; }
+    .aurora span:nth-child(2) { width: 420px; height: 420px; background: var(--accent-2); top: -120px; left: 50%; margin-left: 40px; animation-delay: -11s; }
+    .dots {
+      position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background-image: radial-gradient(var(--border-strong) 1px, transparent 1px);
+      background-size: 22px 22px;
+      mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
+      -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
+    }
+    @keyframes drift { 50% { transform: translate(40px, 60px) scale(1.12); } }
+
+    .wrap { width: 100%; max-width: 520px; }
+
+    /* Top bar */
+    .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; letter-spacing: -.01em; }
+    .logo {
+      width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 6px 20px -6px var(--accent);
+    }
+    .logo svg { width: 17px; height: 17px; }
+    .icon-btn {
+      width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; flex: none;
+      background: var(--surface); border: 1px solid var(--border); color: var(--muted); cursor: pointer;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .icon-btn:hover { color: var(--text); border-color: var(--border-strong); }
+    .icon-btn svg { width: 16px; height: 16px; }
+    .theme-toggle .sun { display: none; }
+    :root[data-theme="light"] .theme-toggle .sun { display: block; }
+    :root[data-theme="light"] .theme-toggle .moon { display: none; }
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]) .theme-toggle .sun { display: block; }
+      :root:not([data-theme="dark"]) .theme-toggle .moon { display: none; }
+    }
+
+    /* Card with gradient hairline border */
+    .card {
+      position: relative; border-radius: 20px; padding: 32px;
+      background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
+    }
+    .card::before {
+      content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none;
+      background: linear-gradient(160deg, var(--accent), transparent 35%, transparent 70%, var(--accent-2));
+      opacity: .55;
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor; mask-composite: exclude;
+    }
+
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+      background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 500; margin-bottom: 14px;
+    }
+    .eyebrow svg { width: 12px; height: 12px; }
+    h1 { font-size: 26px; font-weight: 600; letter-spacing: -.03em; line-height: 1.2; }
+    .sub { color: var(--muted); font-size: 14px; margin: 8px 0 24px; line-height: 1.55; }
+
+    /* Input */
+    .field {
+      display: flex; align-items: center; gap: 4px; padding: 0 6px 0 14px; border-radius: 12px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+    .field > svg { width: 17px; height: 17px; color: var(--faint); flex: none; }
+    input {
+      flex: 1; min-width: 0; padding: 14px 8px; border: 0; background: transparent; color: var(--text);
+      font: 500 14px 'Geist Mono', ui-monospace, monospace; letter-spacing: .02em; outline: none;
+    }
+    input::placeholder { color: var(--faint); font-family: 'Geist', sans-serif; letter-spacing: 0; }
+    .field .icon-btn { width: 30px; height: 30px; border-radius: 8px; background: transparent; border-color: transparent; }
+    .field .icon-btn:hover { background: var(--surface); border-color: var(--border); }
+    .field .icon-btn svg { width: 15px; height: 15px; }
+    #clear[hidden] { display: none; }
+
+    .btn-primary {
+      width: 100%; margin-top: 12px; padding: 13px 16px; border: 0; border-radius: 12px;
+      font: 600 14px 'Geist', sans-serif; color: #fff; cursor: pointer;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, #fff), var(--accent));
+      box-shadow: 0 1px 0 rgba(255,255,255,.2) inset, 0 8px 24px -10px var(--accent);
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: transform .15s, box-shadow .2s, opacity .2s, filter .2s;
+    }
+    .btn-primary:hover:not(:disabled) { filter: brightness(1.06); box-shadow: 0 1px 0 rgba(255,255,255,.2) inset, 0 12px 28px -10px var(--accent); }
+    .btn-primary:active:not(:disabled) { transform: scale(.99); }
+    .btn-primary:disabled { opacity: .75; cursor: default; }
+    kbd {
+      font: 500 11px 'Geist Mono', monospace; padding: 2px 6px; border-radius: 5px;
+      background: rgba(255,255,255,.18); color: rgba(255,255,255,.9);
+    }
+    .btn-primary.loading kbd { display: none; }
+    .spinner {
+      width: 15px; height: 15px; border-radius: 50%; display: none; flex: none;
+      border: 2px solid currentColor; border-top-color: transparent; opacity: .8; animation: spin .7s linear infinite;
+    }
+    .loading .spinner { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Results */
+    #result:empty { display: none; }
+    #result { margin-top: 24px; display: grid; gap: 14px; }
+    @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+
+    .lic {
+      border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+      background: var(--surface-2); animation: rise .35s cubic-bezier(.2,.8,.2,1) both;
+    }
+    .lic:nth-child(2) { animation-delay: .06s; }
+    .lic:nth-child(3) { animation-delay: .12s; }
+    .lic:nth-child(4) { animation-delay: .18s; }
+
+    .lic-head { display: flex; align-items: center; gap: 12px; padding: 16px; }
+    .avatar {
+      width: 40px; height: 40px; border-radius: 11px; flex: none; display: grid; place-items: center;
+      font-weight: 600; font-size: 16px; color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    }
+    .lic-info { flex: 1; min-width: 0; }
+    .lic-title { font-weight: 600; font-size: 15px; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lic-msg { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px;
+      font-size: 12px; font-weight: 500; flex: none;
+    }
+    .pill i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; position: relative; }
+    .pill.ok { background: var(--ok-soft); color: var(--ok); }
+    .pill.ok i::after {
+      content: ''; position: absolute; inset: 0; border-radius: 50%; background: currentColor;
+      animation: ping 1.8s cubic-bezier(0,0,.2,1) infinite;
+    }
+    .pill.bad { background: var(--bad-soft); color: var(--bad); }
+    @keyframes ping { 75%, 100% { transform: scale(2.6); opacity: 0; } }
+
+    .tiles {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
+      background: var(--border); border-top: 1px solid var(--border);
+    }
+    .tile { background: var(--surface-2); padding: 12px 16px; min-width: 0; }
+    .tile dt {
+      display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint);
+    }
+    .tile dt svg { width: 13px; height: 13px; }
+    .tile dd { font-size: 14px; font-weight: 500; margin-top: 4px; word-break: break-word; text-transform: capitalize; }
+    .tile .hint { display: block; font-size: 12px; font-weight: 400; color: var(--faint); margin-top: 1px; text-transform: none; }
+    .tile .hint.warn { color: var(--warn); }
+    .tile .hint.bad { color: var(--bad); }
+    .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+
+    .versions {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      padding: 12px 16px; border-top: 1px solid var(--border);
+    }
+    .versions .lbl { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--faint); }
+    .versions .lbl svg { width: 13px; height: 13px; }
+    .chips { display: flex; gap: 8px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 8px; border-radius: 8px;
+      font: 600 12px 'Geist Mono', monospace; border: 1px solid;
+    }
+    .chip svg { width: 13px; height: 13px; }
+    .chip.on { background: var(--ok-soft); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+    .chip.off { background: transparent; color: var(--faint); border-color: var(--border-strong); }
+
+    .notice {
+      display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+      border-top: 1px solid var(--border); background: var(--warn-soft);
+      color: var(--warn); font-size: 13px; line-height: 1.45;
+    }
+    .notice svg { width: 16px; height: 16px; flex: none; }
+
+    .lic-actions { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+    .btn-reset {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 10px;
+      font: 500 13px 'Geist', sans-serif; cursor: pointer; color: var(--text);
+      background: var(--surface); border: 1px solid var(--border-strong);
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .btn-reset:hover:not(:disabled) { border-color: var(--faint); }
+    .btn-reset:disabled { opacity: .7; cursor: default; }
+    .btn-reset svg { width: 14px; height: 14px; }
+    .btn-reset.confirm { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+    .btn-reset.loading svg { display: none; }
+
+    .toast, .empty {
+      display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px;
+      font-size: 13px; line-height: 1.45; animation: rise .3s ease both;
+    }
+    .toast svg, .empty svg { width: 16px; height: 16px; flex: none; }
+    .toast.ok { background: var(--ok-soft); border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent); color: var(--ok); }
+    .toast.bad, .empty { background: var(--bad-soft); border: 1px solid color-mix(in srgb, var(--bad) 35%, transparent); color: var(--bad); }
+
+    /* Skeleton */
+    .skel { border: 1px solid var(--border); border-radius: 16px; padding: 16px; background: var(--surface-2); }
+    .skel .row { display: flex; gap: 12px; align-items: center; }
+    .skel b {
+      display: block; border-radius: 8px;
+      background: linear-gradient(90deg, var(--border) 25%, var(--border-strong) 50%, var(--border) 75%);
+      background-size: 200% 100%; animation: shimmer 1.2s linear infinite;
+    }
+    @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+    footer { display: flex; justify-content: center; gap: 6px; color: var(--faint); font-size: 12px; margin-top: 20px; }
+
+    @media (max-width: 520px) {
+      .card { padding: 24px 18px; }
+      h1 { font-size: 22px; }
+      .tiles { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="aurora"><span></span><span></span></div>
+  <div class="dots"></div>
+
+  <main class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/>
+          </svg>
+        </div>
+        License Checker
+      </div>
+      <button class="icon-btn theme-toggle" id="theme" type="button" aria-label="Toggle theme">
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </div>
+
+    <div class="card">
+      <span class="eyebrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Secure lookup
+      </span>
+      <h1>Check your license</h1>
+      <p class="sub">Enter your license key to view its status, validity period and bound device.</p>
+
+      <form id="form">
+        <div class="field">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.8-9.8M17 6l3 3M14.5 8.5l2 2"/></svg>
+          <input id="key" placeholder="LIC-XXXXXX-XXXXXX-XXXXXX-XXXXXX" autocomplete="off" spellcheck="false" required />
+          <button class="icon-btn" id="clear" type="button" aria-label="Clear" title="Clear" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+          <button class="icon-btn" id="paste" type="button" aria-label="Paste" title="Paste from clipboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+          </button>
+        </div>
+        <button class="btn-primary" id="btn" type="submit">
+          <span class="spinner"></span><span id="btnText">Check License</span><kbd>↵</kbd>
+        </button>
+      </form>
+
+      <div id="result" aria-live="polite"></div>
+    </div>
+    <footer>&copy; <span id="year"></span> License Checker</footer>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const form = $('form'), btn = $('btn'), result = $('result'), keyInput = $('key');
+    $('year').textContent = new Date().getFullYear();
+
+    // Theme toggle
+    $('theme').addEventListener('click', () => {
+      const root = document.documentElement;
+      const current = root.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      const next = current === 'light' ? 'dark' : 'light';
+      root.dataset.theme = next;
+      try { localStorage.setItem('theme', next); } catch {}
+    });
+
+    // Input helpers
+    const syncClear = () => { $('clear').hidden = !keyInput.value; };
+    keyInput.addEventListener('input', syncClear);
+    $('clear').addEventListener('click', () => { keyInput.value = ''; syncClear(); result.innerHTML = ''; keyInput.focus(); });
+    $('paste').addEventListener('click', async () => {
+      try {
+        keyInput.value = (await navigator.clipboard.readText()).trim();
+        syncClear(); keyInput.focus();
+      } catch { keyInput.focus(); }
+    });
+
+    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+    const fmtDate = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    function expiry(d) {
+      if (!d) return 'Never';
+      const date = new Date(d);
+      if (date.getFullYear() - new Date().getFullYear() > 50) return 'Lifetime';
+      const days = Math.ceil((date - Date.now()) / 864e5);
+      const cls = days < 0 ? 'bad' : days <= 7 ? 'warn' : '';
+      const left = days < 0 ? 'Expired' : `${plural(days, 'day')} left`;
+      return `${fmtDate(d)}<span class="hint ${cls}">${left}</span>`;
+    }
+
+    function lastSeen(d) {
+      if (!d) return '-';
+      const m = Math.floor((Date.now() - new Date(d)) / 6e4);
+      if (m < 1) return 'Just now';
+      if (m < 60) return `${m} min ago`;
+      if (m < 1440) return `${plural(Math.floor(m / 60), 'hour')} ago`;
+      return `${plural(Math.floor(m / 1440), 'day')} ago`;
+    }
+
+    const svg = (d, w = 2) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+    const icons = {
+      ok: svg('<path d="M20 6 9 17l-5-5"/>', 2.5),
+      bad: svg('<path d="M18 6 6 18M6 6l12 12"/>', 2.5),
+      reset: svg('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>'),
+      alert: svg('<circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/>'),
+      status: svg('<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'),
+      slot: svg('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
+      calendar: svg('<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>'),
+      device: svg('<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>'),
+      clock: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+      shield: svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'),
+      layers: svg('<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>'),
+      card: svg('<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>'),
+    };
+
+    const showError = (msg) => { result.innerHTML = `<div class="empty">${icons.alert}${esc(msg)}</div>`; };
+
+    const skeleton = `
+      <div class="skel">
+        <div class="row"><b style="width:40px;height:40px;border-radius:11px"></b>
+          <div style="flex:1;display:grid;gap:8px"><b style="width:45%;height:12px"></b><b style="width:30%;height:10px"></b></div></div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px">
+          ${'<div style="display:grid;gap:6px"><b style="width:50%;height:9px"></b><b style="width:75%;height:12px"></b></div>'.repeat(6)}
+        </div>
+      </div>`;
+
+    const fmtDateTime = (d) => new Date(d).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    function timeUntil(d) {
+      const m = Math.max(0, Math.ceil((new Date(d) - Date.now()) / 6e4));
+      if (m < 60) return `in ${plural(m, 'minute')}`;
+      if (m < 1440) return `in ${plural(Math.floor(m / 60), 'hour')}`;
+      return `in ${plural(Math.floor(m / 1440), 'day')}`;
+    }
+
+    const productName = (p) => p ? p.charAt(0).toUpperCase() + p.slice(1) : 'Unknown product';
+    const tile = (icon, label, value) => `<div class="tile"><dt>${icon}${label}</dt><dd>${value}</dd></div>`;
+
+    function renderVersions(v) {
+      if (!v) return '';
+      const chips = Object.entries(v)
+        .map(([name, on]) => `<span class="chip ${on ? 'on' : 'off'}" title="${name} ${on ? 'enabled' : 'not enabled'}">${on ? icons.ok : icons.bad}${name}</span>`)
+        .join('');
+      return `<div class="versions"><span class="lbl">${icons.layers}Version access</span><div class="chips">${chips}</div></div>`;
+    }
+
+    function renderWhitelist(on) {
+      if (on == null) return '';
+      return `<div class="versions"><span class="lbl">${icons.shield}Whitelist</span><div class="chips"><span class="chip ${on ? 'on' : 'off'}">${on ? icons.ok : icons.bad}${on ? 'Can Use' : 'Not Eligible'}</span></div></div>`;
+    }
+
+    function renderLicense(l) {
+      const cls = l.valid ? 'ok' : 'bad';
+      const name = productName(l.product);
+      const device = l.deviceBound
+        ? '<span class="dot" style="background:var(--ok)"></span>Bound'
+        : '<span class="dot" style="background:var(--faint)"></span>Not bound';
+      return `
+        <article class="lic ${cls}">
+          <div class="lic-head">
+            <div class="avatar">${esc(name.charAt(0))}</div>
+            <div class="lic-info">
+              <div class="lic-title">${esc(name)}</div>
+              <div class="lic-msg">${esc(l.message)}</div>
+            </div>
+            <span class="pill ${cls}"><i></i>${l.valid ? 'Valid' : 'Invalid'}</span>
+          </div>
+          <dl class="tiles">
+            ${tile(icons.status, 'Status', esc(l.status || '-'))}
+            ${tile(icons.slot, 'Slot', esc(l.slot ?? '-'))}
+            ${tile(icons.card, 'Payment', l.paid ? 'Paid' : 'Pending')}
+            ${tile(icons.calendar, 'Expires', expiry(l.expiresAt))}
+            ${tile(icons.device, 'Device', device)}
+            ${tile(icons.clock, 'Last seen', lastSeen(l.lastHeartbeat))}
+          </dl>
+          ${renderVersions(l.versions)}
+          ${renderWhitelist(l.whitelist)}
+          ${l.deleteAt ? `<div class="notice">${icons.alert}<span>Scheduled for deletion on ${fmtDateTime(l.deleteAt)} (${timeUntil(l.deleteAt)})</span></div>` : ''}
+          ${l.deviceBound ? `<div class="lic-actions"><button type="button" class="btn-reset" data-product="${esc(l.product)}"><span class="spinner"></span>${icons.reset}<span class="label">Reset Device</span></button></div>` : ''}
+        </article>`;
+    }
+
+    let currentKey = '';
+
+    async function checkKey(key, toast) {
+      const res = await fetch('/api/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }),
+      });
+      const data = await res.json();
+      if (!data.found) return showError(data.message);
+      currentKey = key;
+      result.innerHTML = (toast || '') + data.licenses.map(renderLicense).join('');
+    }
+
+    const toastHtml = (ok, msg) => `<div class="toast ${ok ? 'ok' : 'bad'}">${ok ? icons.ok : icons.alert}${esc(msg)}</div>`;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      btn.disabled = true; btn.classList.add('loading'); $('btnText').textContent = 'Checking...';
+      result.innerHTML = skeleton;
+      try {
+        await checkKey(keyInput.value.trim());
+      } catch {
+        showError('Unable to reach the server');
+      } finally {
+        btn.disabled = false; btn.classList.remove('loading'); $('btnText').textContent = 'Check License';
+      }
+    });
+
+    // Reset device: first click asks for confirmation, second click within 4s resets
+    result.addEventListener('click', async (e) => {
+      const b = e.target.closest('.btn-reset');
+      if (!b || b.disabled) return;
+      const label = b.querySelector('.label');
+
+      if (!b.classList.contains('confirm')) {
+        b.classList.add('confirm'); label.textContent = 'Click again to confirm';
+        b._timer = setTimeout(() => { b.classList.remove('confirm'); label.textContent = 'Reset Device'; }, 4000);
+        return;
+      }
+
+      clearTimeout(b._timer);
+      b.disabled = true; b.classList.add('loading'); label.textContent = 'Resetting...';
+      try {
+        const res = await fetch('/api/reset-device', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: currentKey, product: b.dataset.product }),
+        });
+        const data = await res.json();
+        await checkKey(currentKey, toastHtml(data.success, data.message));
+      } catch {
+        b.disabled = false; b.classList.remove('loading', 'confirm'); label.textContent = 'Reset Device';
+        result.insertAdjacentHTML('afterbegin', toastHtml(false, 'Unable to reach the server'));
+      }
+    });
+  </script>
+</body>
+</html>
